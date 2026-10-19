@@ -695,6 +695,51 @@ namespace WinFixPro
             ));
 
             items.Add(new FixItem(
+                "check_activation",
+                "Verify Windows Activation & License Status",
+                "Runs official Windows Software Licensing tool (slmgr.vbs) to inspect license channel, expiration date, and activation state.",
+                "Diagnostics",
+                "ACTIVATION",
+                Theme.AccentGreen,
+                false,
+                delegate ()
+                {
+                    FixEngine.Instance.Log("Checking Windows Activation Expiration & License Status...", LogLevel.Info);
+                    FixEngine.Instance.RunCommand("cscript.exe", "//nologo C:\\Windows\\System32\\slmgr.vbs /xpr");
+                    FixEngine.Instance.Log("Querying detailed License Information & Partial Product Key...", LogLevel.Info);
+                    FixEngine.Instance.RunCommand("cscript.exe", "//nologo C:\\Windows\\System32\\slmgr.vbs /dli");
+                }
+            ));
+
+            items.Add(new FixItem(
+                "hardware_specs_report",
+                "Scan Full Hardware & Component Specifications",
+                "Queries live CPU cores, installed RAM, GPU VRAM, physical SSD/HDD drives, and partitions.",
+                "Diagnostics",
+                "HARDWARE",
+                Theme.AccentBlue,
+                false,
+                delegate ()
+                {
+                    FixEngine.Instance.Log("Scanning live system specifications and hardware details...", LogLevel.Info);
+                    SystemSpecs specs = SystemSpecs.FetchLiveSpecs();
+                    string report = specs.ToFormattedReport();
+                    string[] lines = report.Split(new string[] { "\r\n", "\n" }, StringSplitOptions.None);
+                    for (int i = 0; i < lines.Length; i++)
+                    {
+                        if (lines[i].StartsWith("["))
+                        {
+                            FixEngine.Instance.Log(lines[i], LogLevel.Header);
+                        }
+                        else if (!string.IsNullOrEmpty(lines[i]))
+                        {
+                            FixEngine.Instance.Log("  " + lines[i], LogLevel.Info);
+                        }
+                    }
+                }
+            ));
+
+            items.Add(new FixItem(
                 "event_log_scan",
                 "Scan Event Viewer for Critical Errors",
                 "Checks Windows System Event Log for critical errors logged during the last 24 hours.",

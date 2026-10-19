@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
 using System.IO;
+using System.Text;
 using System.Threading;
 using System.Windows.Forms;
 
@@ -33,6 +35,9 @@ namespace WinFixPro
         private Label lblCategoryTitle;
         private Label lblCategoryDesc;
         private ModernButton btnRunAllCategory;
+        private ModernButton btnCopySpecs;
+        private ModernButton btnSaveSpecs;
+        private ModernButton btnRefreshSpecs;
 
         // Console Controls
         private RichTextBox rtbConsole;
@@ -45,6 +50,7 @@ namespace WinFixPro
 
         // Active Cards
         private List<ModernCard> currentCards = new List<ModernCard>();
+        private SystemSpecs cachedSpecs = null;
 
         public MainForm()
         {
@@ -63,7 +69,7 @@ namespace WinFixPro
             Text = string.Format("{0} {1} - {2} | Developed by {3}",
                 AppMeta.AppName, AppMeta.Version, AppMeta.Tagline, AppMeta.Developer);
 
-            Size = new Size(1100, 780);
+            Size = new Size(1120, 790);
             MinimumSize = new Size(980, 680);
             StartPosition = FormStartPosition.CenterScreen;
             BackColor = Theme.BgDark;
@@ -75,6 +81,26 @@ namespace WinFixPro
                 if (File.Exists("app.ico"))
                 {
                     Icon = new Icon("app.ico");
+                }
+                else
+                {
+                    using (Bitmap bmp = new Bitmap(32, 32))
+                    {
+                        using (Graphics g = Graphics.FromImage(bmp))
+                        {
+                            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                            using (Brush b = new SolidBrush(Theme.AccentBlue))
+                                g.FillEllipse(b, 2, 2, 28, 28);
+                            using (Pen p = new Pen(Color.White, 3f))
+                            {
+                                p.StartCap = System.Drawing.Drawing2D.LineCap.Round;
+                                p.EndCap = System.Drawing.Drawing2D.LineCap.Round;
+                                g.DrawLine(p, 9, 16, 14, 21);
+                                g.DrawLine(p, 14, 21, 23, 10);
+                            }
+                        }
+                        Icon = Icon.FromHandle(bmp.GetHicon());
+                    }
                 }
             }
             catch { }
@@ -248,6 +274,7 @@ namespace WinFixPro
             sidebarPanel.Padding = new Padding(0, 8, 0, 8);
 
             AddNavButton("⚡ 1-Click Repair", "Wizard");
+            AddNavButton("💻 Specs & Activation", "Specs");
             AddNavButton("🛡 System Health", "System");
             AddNavButton("🌐 Network & Internet", "Network");
             AddNavButton("🔄 Windows Updates", "Updates");
@@ -323,6 +350,7 @@ namespace WinFixPro
             lblCategoryDesc.Location = new Point(2, 28);
             catHeaderPanel.Controls.Add(lblCategoryDesc);
 
+            // Action Buttons in Header
             btnRunAllCategory = new ModernButton();
             btnRunAllCategory.Text = "▶ Run Selected in Category";
             btnRunAllCategory.Size = new Size(190, 32);
@@ -330,6 +358,33 @@ namespace WinFixPro
             btnRunAllCategory.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             btnRunAllCategory.Click += RunAllInCurrentCategoryClicked;
             catHeaderPanel.Controls.Add(btnRunAllCategory);
+
+            btnSaveSpecs = new ModernButton();
+            btnSaveSpecs.Text = "💾 Save Report";
+            btnSaveSpecs.Size = new Size(115, 32);
+            btnSaveSpecs.Style = ButtonStyle.Success;
+            btnSaveSpecs.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            btnSaveSpecs.Visible = false;
+            btnSaveSpecs.Click += SaveSpecsReportClicked;
+            catHeaderPanel.Controls.Add(btnSaveSpecs);
+
+            btnCopySpecs = new ModernButton();
+            btnCopySpecs.Text = "📋 Copy Specs";
+            btnCopySpecs.Size = new Size(110, 32);
+            btnCopySpecs.Style = ButtonStyle.Secondary;
+            btnCopySpecs.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            btnCopySpecs.Visible = false;
+            btnCopySpecs.Click += CopySpecsReportClicked;
+            catHeaderPanel.Controls.Add(btnCopySpecs);
+
+            btnRefreshSpecs = new ModernButton();
+            btnRefreshSpecs.Text = "🔄 Refresh";
+            btnRefreshSpecs.Size = new Size(95, 32);
+            btnRefreshSpecs.Style = ButtonStyle.Primary;
+            btnRefreshSpecs.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            btnRefreshSpecs.Visible = false;
+            btnRefreshSpecs.Click += delegate { SetupSpecsView(); };
+            catHeaderPanel.Controls.Add(btnRefreshSpecs);
 
             // Cards scrollable container
             cardsContainer = new Panel();
@@ -373,9 +428,13 @@ namespace WinFixPro
                 lblSysInfo.Location = new Point(lblAdminBadge.Left - lblSysInfo.Width - 18, 22);
             }
 
-            if (btnRunAllCategory != null && catHeaderPanel != null)
+            if (catHeaderPanel != null)
             {
-                btnRunAllCategory.Location = new Point(catHeaderPanel.Width - btnRunAllCategory.Width - 8, 10);
+                int r = catHeaderPanel.Width - 8;
+                if (btnRunAllCategory != null) btnRunAllCategory.Location = new Point(r - btnRunAllCategory.Width, 10);
+                if (btnSaveSpecs != null) btnSaveSpecs.Location = new Point(r - btnSaveSpecs.Width, 10);
+                if (btnCopySpecs != null && btnSaveSpecs != null) btnCopySpecs.Location = new Point(btnSaveSpecs.Left - btnCopySpecs.Width - 8, 10);
+                if (btnRefreshSpecs != null && btnCopySpecs != null) btnRefreshSpecs.Location = new Point(btnCopySpecs.Left - btnRefreshSpecs.Width - 8, 10);
             }
 
             ResizeCurrentCards();
@@ -383,12 +442,13 @@ namespace WinFixPro
 
         private void ResizeCurrentCards()
         {
-            if (cardsContainer == null || currentCards == null) return;
+            if (cardsContainer == null) return;
             int targetWidth = Math.Max(300, cardsContainer.ClientSize.Width - 28);
-            for (int i = 0; i < currentCards.Count; i++)
+            for (int i = 0; i < cardsContainer.Controls.Count; i++)
             {
-                currentCards[i].Width = targetWidth;
-                currentCards[i].Left = 14;
+                Control c = cardsContainer.Controls[i];
+                c.Width = targetWidth;
+                c.Left = 14;
             }
         }
 
@@ -397,8 +457,8 @@ namespace WinFixPro
             ModernButton btn = new ModernButton();
             btn.Text = label;
             btn.Style = ButtonStyle.Sidebar;
-            btn.Size = new Size(230, 44);
-            btn.Location = new Point(0, 8 + navButtons.Count * 46);
+            btn.Size = new Size(230, 42);
+            btn.Location = new Point(0, 6 + navButtons.Count * 44);
             btn.Tag = categoryTag;
             btn.Click += delegate (object s, EventArgs e)
             {
@@ -445,9 +505,18 @@ namespace WinFixPro
             cardsContainer.Controls.Clear();
             currentCards.Clear();
 
+            btnRunAllCategory.Visible = false;
+            btnCopySpecs.Visible = false;
+            btnSaveSpecs.Visible = false;
+            btnRefreshSpecs.Visible = false;
+
             if (category == "Wizard")
             {
                 SetupWizardView();
+            }
+            else if (category == "Specs")
+            {
+                SetupSpecsView();
             }
             else
             {
@@ -540,9 +609,266 @@ namespace WinFixPro
             cardsContainer.Controls.Add(tip);
         }
 
+        private void SetupSpecsView()
+        {
+            lblCategoryTitle.Text = "System Hardware & Windows Information";
+            lblCategoryDesc.Text = "Live overview of Windows activation, processor, RAM, graphics card, and storage space.";
+            btnRunAllCategory.Visible = false;
+            btnSaveSpecs.Visible = true;
+            btnCopySpecs.Visible = true;
+            btnRefreshSpecs.Visible = true;
+
+            cardsContainer.Controls.Clear();
+            currentCards.Clear();
+
+            cachedSpecs = SystemSpecs.FetchLiveSpecs();
+            int availWidth = Math.Max(300, cardsContainer.ClientSize.Width - 28);
+            int topOffset = 8;
+
+            // 1. OS & Activation Card
+            string osDetails = string.Format(
+                "Edition:          {0} ({1})\n" +
+                "Build & Version:  {2} (Kernel {3})\n" +
+                "License State:    {4}\n" +
+                "License Channel:  {5}\n" +
+                "Partial Key:      {6}\n" +
+                "Computer & User:  {7} \\ {8}",
+                cachedSpecs.OsName, cachedSpecs.OsArch,
+                cachedSpecs.OsBuild, cachedSpecs.OsVersion,
+                cachedSpecs.ActivationStatus,
+                string.IsNullOrEmpty(cachedSpecs.ActivationChannel) ? "Standard OEM/Retail" : cachedSpecs.ActivationChannel,
+                string.IsNullOrEmpty(cachedSpecs.PartialKey) ? "N/A" : "*****-" + cachedSpecs.PartialKey,
+                cachedSpecs.ComputerName, cachedSpecs.UserName);
+
+            Panel pnlOs = CreateSpecsDisplayCard(
+                "Windows Operating System & Activation",
+                cachedSpecs.IsActivated ? "✔ ACTIVATED" : "[!] UNLICENSED",
+                cachedSpecs.IsActivated ? Theme.AccentGreen : Theme.AccentAmber,
+                osDetails,
+                "🔑 Check SLMGR",
+                delegate
+                {
+                    FixEngine.Instance.StartTask("Check Windows Activation (SLMGR)", delegate ()
+                    {
+                        FixEngine.Instance.Log("Checking Windows Activation Expiration...", LogLevel.Info);
+                        FixEngine.Instance.RunCommand("cscript.exe", "//nologo C:\\Windows\\System32\\slmgr.vbs /xpr");
+                        FixEngine.Instance.Log("Querying Detailed License Channel & Key Info...", LogLevel.Info);
+                        FixEngine.Instance.RunCommand("cscript.exe", "//nologo C:\\Windows\\System32\\slmgr.vbs /dli");
+                    });
+                },
+                availWidth, ref topOffset
+            );
+            cardsContainer.Controls.Add(pnlOs);
+
+            // 2. Processor (CPU) Card
+            string cpuDetails = string.Format(
+                "Processor Model:  {0}\n" +
+                "Core Count:       {1} Physical Cores / {2} Logical Threads\n" +
+                "Architecture:     {3} processor architecture",
+                cachedSpecs.CpuName, cachedSpecs.CpuCores, cachedSpecs.CpuThreads, cachedSpecs.CpuArch);
+
+            Panel pnlCpu = CreateSpecsDisplayCard(
+                "Processor (CPU)",
+                "PROCESSOR",
+                Theme.AccentBlue,
+                cpuDetails,
+                null, null,
+                availWidth, ref topOffset
+            );
+            cardsContainer.Controls.Add(pnlCpu);
+
+            // 3. Memory (RAM) Card
+            string ramDetails = string.Format(
+                "Installed RAM:    {0:F1} GB Total Physical Memory\n" +
+                "Active Usage:     {1:F1} GB Used ({2}%) | {3:F1} GB Available Free",
+                cachedSpecs.TotalRamGB, cachedSpecs.UsedRamGB, cachedSpecs.RamPctUsed, cachedSpecs.FreeRamGB);
+
+            Panel pnlRam = CreateSpecsDisplayCard(
+                "Installed Memory (RAM)",
+                "MEMORY",
+                Theme.AccentIndigo,
+                ramDetails,
+                null, null,
+                availWidth, ref topOffset
+            );
+            // Append visual progress bar for RAM
+            ModernProgressBar ramBar = new ModernProgressBar();
+            ramBar.Size = new Size(availWidth - 40, 16);
+            ramBar.Location = new Point(18, pnlRam.Height - 14);
+            ramBar.Value = cachedSpecs.RamPctUsed;
+            ramBar.CustomText = string.Format("RAM in Use: {0}% ({1:F1} GB / {2:F1} GB)", cachedSpecs.RamPctUsed, cachedSpecs.UsedRamGB, cachedSpecs.TotalRamGB);
+            pnlRam.Height += 24;
+            pnlRam.Controls.Add(ramBar);
+            topOffset += 24;
+            cardsContainer.Controls.Add(pnlRam);
+
+            // 4. Graphics Card (GPU) Card
+            StringBuilder gpuSb = new StringBuilder();
+            if (cachedSpecs.Gpus.Count == 0)
+            {
+                gpuSb.AppendLine("No discrete or integrated video controller detected.");
+            }
+            else
+            {
+                for (int i = 0; i < cachedSpecs.Gpus.Count; i++)
+                {
+                    GpuInfo g = cachedSpecs.Gpus[i];
+                    gpuSb.AppendLine(string.Format("GPU #{0}: {1}  |  VRAM: {2} MB  |  Driver: {3}",
+                        i + 1, g.Name, g.VramMB, g.DriverVersion));
+                }
+            }
+
+            Panel pnlGpu = CreateSpecsDisplayCard(
+                "Graphics Cards & Display (GPU)",
+                "GRAPHICS",
+                Theme.AccentCyan,
+                gpuSb.ToString().TrimEnd(),
+                null, null,
+                availWidth, ref topOffset
+            );
+            cardsContainer.Controls.Add(pnlGpu);
+
+            // 5. Storage Drives & Disk Space Card
+            StringBuilder diskSb = new StringBuilder();
+            if (cachedSpecs.PhysicalDisks.Count > 0)
+            {
+                diskSb.AppendLine("Physical Disks:  " + string.Join("  •  ", cachedSpecs.PhysicalDisks.ToArray()));
+            }
+            for (int i = 0; i < cachedSpecs.Volumes.Count; i++)
+            {
+                VolumeInfo v = cachedSpecs.Volumes[i];
+                diskSb.AppendLine(string.Format("Drive {0} [{1}]:  {2:F1} GB Free of {3:F1} GB  ({4}% Used, {5})",
+                    v.DriveLetter, v.VolumeLabel, v.FreeGB, v.TotalGB, v.PctUsed, v.FileSystem));
+            }
+
+            Panel pnlDisk = CreateSpecsDisplayCard(
+                "Storage Drives & Disk Space",
+                "STORAGE",
+                Theme.AccentAmber,
+                diskSb.ToString().TrimEnd(),
+                "🧹 Disk Cleanup",
+                delegate
+                {
+                    FixEngine.Instance.StartTask("Launch Windows Disk Cleanup", delegate ()
+                    {
+                        FixEngine.Instance.Log("Launching native Windows cleanmgr...", LogLevel.Info);
+                        Process.Start("cleanmgr.exe", "/d C:");
+                    });
+                },
+                availWidth, ref topOffset
+            );
+            cardsContainer.Controls.Add(pnlDisk);
+
+            // 6. Motherboard & BIOS Card
+            string boardDetails = string.Format(
+                "Motherboard:      {0}\n" +
+                "BIOS Version:     {1}",
+                string.IsNullOrEmpty(cachedSpecs.Motherboard) ? "Standard Motherboard / OEM" : cachedSpecs.Motherboard,
+                string.IsNullOrEmpty(cachedSpecs.BiosVersion) ? "Standard BIOS" : cachedSpecs.BiosVersion);
+
+            Panel pnlBoard = CreateSpecsDisplayCard(
+                "Motherboard & BIOS Information",
+                "HARDWARE",
+                Theme.AccentPurple,
+                boardDetails,
+                null, null,
+                availWidth, ref topOffset
+            );
+            cardsContainer.Controls.Add(pnlBoard);
+        }
+
+        private Panel CreateSpecsDisplayCard(string title, string badge, Color badgeColor, string content, string buttonText, Action buttonAction, int width, ref int topOffset)
+        {
+            Panel card = new Panel();
+            card.BackColor = Theme.BgCard;
+            card.Location = new Point(14, topOffset);
+            card.Padding = new Padding(14);
+
+            Label lblTitle = new Label();
+            lblTitle.Text = title;
+            lblTitle.Font = Theme.FontTitle;
+            lblTitle.ForeColor = Theme.TextMain;
+            lblTitle.AutoSize = true;
+            lblTitle.UseMnemonic = false;
+            lblTitle.Location = new Point(14, 12);
+            card.Controls.Add(lblTitle);
+
+            if (!string.IsNullOrEmpty(badge))
+            {
+                Label lblBadge = new Label();
+                lblBadge.Text = badge;
+                lblBadge.Font = Theme.FontSmallBold;
+                lblBadge.ForeColor = badgeColor;
+                lblBadge.BackColor = Color.FromArgb(40, badgeColor);
+                lblBadge.AutoSize = true;
+                lblBadge.UseMnemonic = false;
+                lblBadge.Padding = new Padding(6, 2, 6, 2);
+                lblBadge.Location = new Point(lblTitle.Right + 12, 11);
+                card.Controls.Add(lblBadge);
+            }
+
+            if (!string.IsNullOrEmpty(buttonText) && buttonAction != null)
+            {
+                ModernButton btn = new ModernButton();
+                btn.Text = buttonText;
+                btn.Size = new Size(130, 30);
+                btn.Style = ButtonStyle.Primary;
+                btn.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+                btn.Location = new Point(width - 145, 12);
+                btn.Click += delegate { buttonAction(); };
+                card.Controls.Add(btn);
+            }
+
+            Label lblBody = new Label();
+            lblBody.Text = content;
+            lblBody.Font = Theme.FontRegular;
+            lblBody.ForeColor = Theme.TextSecondary;
+            lblBody.AutoSize = true;
+            lblBody.UseMnemonic = false;
+            lblBody.Location = new Point(16, 38);
+            card.Controls.Add(lblBody);
+
+            int cardHeight = Math.Max(75, lblBody.Bottom + 14);
+            card.Size = new Size(width, cardHeight);
+            topOffset += cardHeight + 10;
+
+            return card;
+        }
+
+        private void CopySpecsReportClicked(object sender, EventArgs e)
+        {
+            if (cachedSpecs == null) cachedSpecs = SystemSpecs.FetchLiveSpecs();
+            string rpt = cachedSpecs.ToFormattedReport();
+            Clipboard.SetText(rpt);
+            lblStatus.Text = "System hardware & Windows specifications copied to clipboard!";
+        }
+
+        private void SaveSpecsReportClicked(object sender, EventArgs e)
+        {
+            if (cachedSpecs == null) cachedSpecs = SystemSpecs.FetchLiveSpecs();
+            string rpt = cachedSpecs.ToFormattedReport();
+            string desktop = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+            string dest = Path.Combine(desktop, string.Format("WinFixPro_Specs_{0:yyyyMMdd_HHmmss}.txt", DateTime.Now));
+            try
+            {
+                File.WriteAllText(dest, rpt, Encoding.UTF8);
+                MessageBox.Show("Hardware and Windows specification report saved to:\n" + dest,
+                    "Report Saved", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                Process.Start("notepad.exe", dest);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Could not save report: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
         private void SetupCategoryView(string category)
         {
             btnRunAllCategory.Visible = true;
+            btnCopySpecs.Visible = false;
+            btnSaveSpecs.Visible = false;
+            btnRefreshSpecs.Visible = false;
+
             List<FixItem> items = FixModules.GetItemsByCategory(category);
 
             switch (category)

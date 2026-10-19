@@ -10,7 +10,7 @@ namespace WinFixPro
     public static class AppMeta
     {
         public const string AppName = "WinFixPro";
-        public const string Version = "v2.7";
+        public const string Version = "v2.9";
         public const string Developer = "Soumya Ranjan Sethy";
         public const string Tagline = "Portable Multi-System Windows Repair Toolkit";
     }

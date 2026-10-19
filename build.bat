@@ -23,7 +23,7 @@ if not exist "%CSC%" (
 )
 
 echo [1/2] Compiling C# source code using %CSC%...
-"%CSC%" /nologo /target:winexe /optimize+ /out:"%~dp0WinFixPro.exe" /win32manifest:"%~dp0app.manifest" /win32icon:"%~dp0app.ico" /r:System.dll /r:System.Core.dll /r:System.Drawing.dll /r:System.Windows.Forms.dll /r:System.Management.dll "%~dp0src\Theme.cs" "%~dp0src\FixEngine.cs" "%~dp0src\FixModules.cs" "%~dp0src\MainForm.cs" "%~dp0src\Program.cs"
+"%CSC%" /nologo /target:winexe /optimize+ /out:"WinFixPro.exe" /win32manifest:"app.manifest" /r:System.dll /r:System.Core.dll /r:System.Drawing.dll /r:System.Windows.Forms.dll /r:System.Management.dll src\Theme.cs src\SystemSpecs.cs src\FixEngine.cs src\FixModules.cs src\MainForm.cs src\Program.cs
 
 if %ERRORLEVEL% equ 0 (
     echo.

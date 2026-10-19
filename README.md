@@ -1,4 +1,4 @@
-# WinFixPro - Portable Windows Repair & Optimization Toolkit (v2.7)
+# WinFixPro - Portable Windows Repair & Optimization Toolkit (v2.9)
 
 > **Developed by Soumya Ranjan Sethy**  
 > *A lightweight, portable, zero-install toolkit for troubleshooting and repairing Windows systems.*
@@ -14,6 +14,7 @@ No installation, no third-party runtimes (Python, Node, or external dependencies
 - **100% Portable**: Single-file executable (`WinFixPro.exe`). Run directly from a USB stick, external drive, or folder.
 - **Universal Windows Compatibility**: Runs natively on **Windows 11, Windows 10, Windows 8.1, and Windows 7** (both 64-bit and 32-bit).
 - **Zero Runtime Dependencies**: Built with native Windows .NET Framework 4.0/4.8 components pre-installed on every modern Windows system.
+- **💻 Live Hardware & Activation Dashboard**: Live inspection of Windows activation (licensed state, channel, partial key), total & free drive space across all partitions, RAM in use vs available with visual progress bar, GPU model & VRAM, processor cores & architecture, and motherboard/BIOS.
 - **Modern Dark UI**: Fluid, high-DPI aware dark interface with live logging console, categorized fix cards, and visual progress tracking.
 - **Live Activity Console**: Streams real-time command output line-by-line with color-coded severity (Info, Success, Warning, Error) and 1-click log export.
 - **Task Safety & Control**: Includes a "Cancel Task" button to abort long-running tasks, plus pre-repair System Restore Point creation.
