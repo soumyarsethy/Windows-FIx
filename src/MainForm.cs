@@ -660,7 +660,73 @@ namespace WinFixPro
             );
             cardsContainer.Controls.Add(pnlOs);
 
-            // 2. Processor (CPU) Card
+            // 2. Microsoft Office & Activation Card
+            string officeBadge = "NOT DETECTED";
+            Color officeBadgeColor = Theme.TextMuted;
+            string officeDetails = "No active Microsoft Office suite installation detected on this system.";
+
+            if (cachedSpecs.Office != null && cachedSpecs.Office.IsInstalled)
+            {
+                officeBadge = cachedSpecs.Office.IsActivated ? "✔ LICENSED" : "[!] UNLICENSED";
+                officeBadgeColor = cachedSpecs.Office.IsActivated ? Theme.AccentGreen : Theme.AccentRed;
+
+                officeDetails = string.Format(
+                    "Product:          {0} ({1})\n" +
+                    "Version:          {2}\n" +
+                    "License State:    {3}\n" +
+                    "License Channel:  {4}\n" +
+                    "Partial Key:      {5}\n" +
+                    "Install Path:     {6}",
+                    cachedSpecs.Office.ProductName,
+                    string.IsNullOrEmpty(cachedSpecs.Office.Architecture) ? "Standard" : cachedSpecs.Office.Architecture,
+                    string.IsNullOrEmpty(cachedSpecs.Office.Version) ? "N/A" : cachedSpecs.Office.Version,
+                    cachedSpecs.Office.LicenseStatus,
+                    string.IsNullOrEmpty(cachedSpecs.Office.LicenseChannel) ? "Standard Retail/OEM" : cachedSpecs.Office.LicenseChannel,
+                    string.IsNullOrEmpty(cachedSpecs.Office.PartialKey) ? "N/A" : "*****-" + cachedSpecs.Office.PartialKey,
+                    string.IsNullOrEmpty(cachedSpecs.Office.InstallPath) ? "Standard Windows Directory" : cachedSpecs.Office.InstallPath);
+            }
+
+            Panel pnlOffice = CreateSpecsDisplayCard(
+                "Microsoft Office & Activation Status",
+                officeBadge,
+                officeBadgeColor,
+                officeDetails,
+                (cachedSpecs.Office != null && cachedSpecs.Office.IsInstalled) ? "🔑 Check OSPP" : null,
+                delegate
+                {
+                    FixEngine.Instance.StartTask("Check Microsoft Office License (OSPP.VBS)", delegate ()
+                    {
+                        FixEngine.Instance.Log("Searching for Microsoft Office Software Protection script (ospp.vbs)...", LogLevel.Info);
+                        string[] possiblePaths = new string[]
+                        {
+                            @"C:\Program Files\Microsoft Office\Office16\OSPP.VBS",
+                            @"C:\Program Files (x86)\Microsoft Office\Office16\OSPP.VBS",
+                            @"C:\Program Files\Microsoft Office\Office15\OSPP.VBS",
+                            @"C:\Program Files (x86)\Microsoft Office\Office15\OSPP.VBS",
+                            @"C:\Program Files\Microsoft Office\root\Office16\OSPP.VBS"
+                        };
+                        string found = null;
+                        foreach (string p in possiblePaths)
+                        {
+                            if (File.Exists(p)) { found = p; break; }
+                        }
+                        if (found != null)
+                        {
+                            FixEngine.Instance.Log("Executing: cscript.exe //nologo \"" + found + "\" /dstatus", LogLevel.Info);
+                            FixEngine.Instance.RunCommand("cscript.exe", string.Format("//nologo \"{0}\" /dstatus", found));
+                        }
+                        else
+                        {
+                            FixEngine.Instance.Log("OSPP.VBS not found in standard paths. Querying WMI SoftwareLicensingProduct...", LogLevel.Warning);
+                            FixEngine.Instance.RunPowerShell("Get-CimInstance SoftwareLicensingProduct | Where-Object { $_.PartialProductKey -and $_.Name -like '*Office*' } | Select-Object Name, Description, LicenseStatus, PartialProductKey | Format-List");
+                        }
+                    });
+                },
+                availWidth, ref topOffset
+            );
+            cardsContainer.Controls.Add(pnlOffice);
+
+            // 3. Processor (CPU) Card
             string cpuDetails = string.Format(
                 "Processor Model:  {0}\n" +
                 "Core Count:       {1} Physical Cores / {2} Logical Threads\n" +
@@ -677,7 +743,7 @@ namespace WinFixPro
             );
             cardsContainer.Controls.Add(pnlCpu);
 
-            // 3. Memory (RAM) Card
+            // 4. Memory (RAM) Card
             string ramDetails = string.Format(
                 "Installed RAM:    {0:F1} GB Total Physical Memory\n" +
                 "Active Usage:     {1:F1} GB Used ({2}%) | {3:F1} GB Available Free",
@@ -702,7 +768,7 @@ namespace WinFixPro
             topOffset += 24;
             cardsContainer.Controls.Add(pnlRam);
 
-            // 4. Graphics Card (GPU) Card
+            // 5. Graphics Card (GPU) Card
             StringBuilder gpuSb = new StringBuilder();
             if (cachedSpecs.Gpus.Count == 0)
             {
@@ -728,7 +794,7 @@ namespace WinFixPro
             );
             cardsContainer.Controls.Add(pnlGpu);
 
-            // 5. Storage Drives & Disk Space Card
+            // 6. Storage Drives & Disk Space Card
             StringBuilder diskSb = new StringBuilder();
             if (cachedSpecs.PhysicalDisks.Count > 0)
             {
@@ -759,7 +825,7 @@ namespace WinFixPro
             );
             cardsContainer.Controls.Add(pnlDisk);
 
-            // 6. Motherboard & BIOS Card
+            // 7. Motherboard & BIOS Card
             string boardDetails = string.Format(
                 "Motherboard:      {0}\n" +
                 "BIOS Version:     {1}",
@@ -775,6 +841,157 @@ namespace WinFixPro
                 availWidth, ref topOffset
             );
             cardsContainer.Controls.Add(pnlBoard);
+
+            // 8. Installed Software & Applications Inventory Card
+            int appCount = cachedSpecs.InstalledSoftware != null ? cachedSpecs.InstalledSoftware.Count : 0;
+            Panel pnlAppsCard = new Panel();
+            pnlAppsCard.Location = new Point(14, topOffset);
+            pnlAppsCard.Size = new Size(availWidth, 420);
+            pnlAppsCard.BackColor = Theme.BgCard;
+            pnlAppsCard.Padding = new Padding(14);
+
+            Label lblAppTitle = new Label();
+            lblAppTitle.Text = "Installed Software & Programs Inventory";
+            lblAppTitle.Font = Theme.FontTitle;
+            lblAppTitle.ForeColor = Theme.TextMain;
+            lblAppTitle.Location = new Point(14, 12);
+            lblAppTitle.AutoSize = true;
+            pnlAppsCard.Controls.Add(lblAppTitle);
+
+            Label lblAppBadge = new Label();
+            lblAppBadge.Text = string.Format("{0} APPS DETECTED", appCount);
+            lblAppBadge.Font = Theme.FontSmallBold;
+            lblAppBadge.ForeColor = Theme.AccentBlue;
+            lblAppBadge.BackColor = Color.FromArgb(40, Theme.AccentBlue);
+            lblAppBadge.Padding = new Padding(6, 2, 6, 2);
+            lblAppBadge.Location = new Point(lblAppTitle.Right + 12, 11);
+            lblAppBadge.AutoSize = true;
+            pnlAppsCard.Controls.Add(lblAppBadge);
+
+            // Search Box
+            TextBox txtAppSearch = new TextBox();
+            txtAppSearch.Location = new Point(16, 42);
+            txtAppSearch.Size = new Size(Math.Max(150, availWidth - 280), 24);
+            txtAppSearch.BackColor = Theme.ConsoleBg;
+            txtAppSearch.ForeColor = Theme.TextMain;
+            txtAppSearch.BorderStyle = BorderStyle.FixedSingle;
+            txtAppSearch.Font = Theme.FontRegular;
+            pnlAppsCard.Controls.Add(txtAppSearch);
+
+            // Copy Apps Button
+            ModernButton btnCopyApps = new ModernButton();
+            btnCopyApps.Text = "📋 Copy List";
+            btnCopyApps.Style = ButtonStyle.Secondary;
+            btnCopyApps.Location = new Point(availWidth - 250, 40);
+            btnCopyApps.Size = new Size(110, 26);
+            pnlAppsCard.Controls.Add(btnCopyApps);
+
+            // Export CSV Button
+            ModernButton btnExportApps = new ModernButton();
+            btnExportApps.Text = "💾 Export CSV";
+            btnExportApps.Style = ButtonStyle.Primary;
+            btnExportApps.Location = new Point(availWidth - 130, 40);
+            btnExportApps.Size = new Size(110, 26);
+            pnlAppsCard.Controls.Add(btnExportApps);
+
+            // Software ListView
+            ListView lvApps = new ListView();
+            lvApps.Location = new Point(16, 76);
+            lvApps.Size = new Size(availWidth - 32, 324);
+            lvApps.View = View.Details;
+            lvApps.FullRowSelect = true;
+            lvApps.GridLines = true;
+            lvApps.BackColor = Theme.ConsoleBg;
+            lvApps.ForeColor = Theme.TextMain;
+            lvApps.Font = Theme.FontRegular;
+            lvApps.BorderStyle = BorderStyle.FixedSingle;
+
+            int colW = availWidth - 40;
+            lvApps.Columns.Add("Program Name", (int)(colW * 0.44));
+            lvApps.Columns.Add("Version", (int)(colW * 0.18));
+            lvApps.Columns.Add("Publisher", (int)(colW * 0.24));
+            lvApps.Columns.Add("Install Date", (int)(colW * 0.14));
+
+            Action<string> populateList = delegate(string query)
+            {
+                lvApps.BeginUpdate();
+                lvApps.Items.Clear();
+                if (cachedSpecs.InstalledSoftware != null)
+                {
+                    string q = (query ?? "").Trim();
+                    for (int i = 0; i < cachedSpecs.InstalledSoftware.Count; i++)
+                    {
+                        InstalledApp app = cachedSpecs.InstalledSoftware[i];
+                        if (string.IsNullOrEmpty(q) ||
+                            app.Name.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0 ||
+                            app.Publisher.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            ListViewItem item = new ListViewItem(app.Name);
+                            item.SubItems.Add(app.Version);
+                            item.SubItems.Add(app.Publisher);
+                            item.SubItems.Add(app.InstallDate);
+                            lvApps.Items.Add(item);
+                        }
+                    }
+                }
+                lvApps.EndUpdate();
+            };
+
+            populateList("");
+
+            txtAppSearch.TextChanged += delegate
+            {
+                populateList(txtAppSearch.Text);
+            };
+
+            btnCopyApps.Click += delegate
+            {
+                if (cachedSpecs.InstalledSoftware == null || cachedSpecs.InstalledSoftware.Count == 0) return;
+                StringBuilder sbApps = new StringBuilder();
+                sbApps.AppendLine(string.Format("Installed Applications Inventory ({0} Apps) - Generated by WinFixPro {1}", cachedSpecs.InstalledSoftware.Count, AppMeta.Version));
+                sbApps.AppendLine("Name | Version | Publisher | Install Date");
+                sbApps.AppendLine("---|---|---|---");
+                for (int i = 0; i < cachedSpecs.InstalledSoftware.Count; i++)
+                {
+                    InstalledApp app = cachedSpecs.InstalledSoftware[i];
+                    sbApps.AppendLine(string.Format("{0} | {1} | {2} | {3}", app.Name, app.Version, app.Publisher, app.InstallDate));
+                }
+                Clipboard.SetText(sbApps.ToString());
+                MessageBox.Show(string.Format("Successfully copied inventory of {0} installed applications to clipboard!", cachedSpecs.InstalledSoftware.Count), "Software Inventory Copied", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            };
+
+            btnExportApps.Click += delegate
+            {
+                if (cachedSpecs.InstalledSoftware == null || cachedSpecs.InstalledSoftware.Count == 0) return;
+                try
+                {
+                    string desktop = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
+                    string filename = string.Format("Installed_Software_{0}_{1}.csv", Environment.MachineName, DateTime.Now.ToString("yyyyMMdd_HHmmss"));
+                    string outPath = Path.Combine(desktop, filename);
+
+                    StringBuilder csv = new StringBuilder();
+                    csv.AppendLine("\"Program Name\",\"Version\",\"Publisher\",\"Install Date\"");
+                    for (int i = 0; i < cachedSpecs.InstalledSoftware.Count; i++)
+                    {
+                        InstalledApp app = cachedSpecs.InstalledSoftware[i];
+                        csv.AppendLine(string.Format("\"{0}\",\"{1}\",\"{2}\",\"{3}\"",
+                            app.Name.Replace("\"", "\"\""),
+                            app.Version.Replace("\"", "\"\""),
+                            app.Publisher.Replace("\"", "\"\""),
+                            app.InstallDate.Replace("\"", "\"\"")));
+                    }
+                    File.WriteAllText(outPath, csv.ToString(), Encoding.UTF8);
+                    MessageBox.Show("Installed software inventory exported to CSV:\n\n" + outPath, "Export Successful", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Export failed: " + ex.Message, "Export Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            };
+
+            pnlAppsCard.Controls.Add(lvApps);
+            topOffset += pnlAppsCard.Height + 14;
+            cardsContainer.Controls.Add(pnlAppsCard);
         }
 
         private Panel CreateSpecsDisplayCard(string title, string badge, Color badgeColor, string content, string buttonText, Action buttonAction, int width, ref int topOffset)

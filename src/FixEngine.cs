@@ -262,7 +262,7 @@ namespace WinFixPro
 
         public int RunPowerShell(string script)
         {
-            string encoded = "-NoProfile -ExecutionPolicy Bypass -Command \"" + script.Replace("\"", "\\\"") + "\"";
+            string encoded = "-NoProfile -NonInteractive -Command \"" + script.Replace("\"", "\\\"") + "\"";
             return RunCommand("powershell.exe", encoded);
         }
 

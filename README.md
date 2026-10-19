@@ -1,20 +1,22 @@
-# WinFixPro - Portable Windows Repair & Optimization Toolkit (v2.9)
+# WinFixPro - Portable Windows Repair & Optimization Toolkit (v3.0)
 
 > **Developed by Soumya Ranjan Sethy**  
 > *A lightweight, portable, zero-install toolkit for troubleshooting and repairing Windows systems.*
 
-**WinFixPro** is a standalone, lightweight (~85 KB), portable utility designed for IT technicians, system administrators, and everyday users to diagnose, repair, and optimize Windows systems.
+**WinFixPro** is a standalone, lightweight (~95 KB), portable utility designed for IT technicians, system administrators, and everyday users to diagnose, repair, and optimize Windows systems.
 
-No installation, no third-party runtimes (Python, Node, or external dependencies) are required. Just copy **`WinFixPro.exe`** onto any USB flash drive and run it on any Windows computer.
+No installation, no third-party runtimes (Python, Node, or external dependencies) are required. Just copy **`WinFix.exe`** onto any USB flash drive and run it on any Windows computer.
 
 ---
 
 ## 🚀 Key Highlights
 
-- **100% Portable**: Single-file executable (`WinFixPro.exe`). Run directly from a USB stick, external drive, or folder.
+- **100% Portable**: Single-file executable (`WinFix.exe`). Run directly from a USB stick, external drive, or folder.
 - **Universal Windows Compatibility**: Runs natively on **Windows 11, Windows 10, Windows 8.1, and Windows 7** (both 64-bit and 32-bit).
 - **Zero Runtime Dependencies**: Built with native Windows .NET Framework 4.0/4.8 components pre-installed on every modern Windows system.
-- **💻 Live Hardware & Activation Dashboard**: Live inspection of Windows activation (licensed state, channel, partial key), total & free drive space across all partitions, RAM in use vs available with visual progress bar, GPU model & VRAM, processor cores & architecture, and motherboard/BIOS.
+- **💻 Live Hardware, Storage & OS Specs**: Real-time inspection of Windows edition, build, uptime, total & free drive space per partition, RAM usage bar, GPU details, CPU cores/threads, and motherboard/BIOS.
+- **🪟 Windows & Microsoft Office Activation Inspector**: Live genuine activation status detection for both Windows OS and Microsoft Office suites (Office 365, Office 2021, 2019, 2016, 2013), showing license state (`✔ LICENSED` / `[!] UNLICENSED`), licensing channel (Retail/MAK/KMS), and partial product keys.
+- **📦 Installed Software Inventory & Search**: Live interactive inventory of all installed software with versions, publishers, and install dates. Features instant keyword search, 1-click clipboard copy, and CSV export.
 - **Modern Dark UI**: Fluid, high-DPI aware dark interface with live logging console, categorized fix cards, and visual progress tracking.
 - **Live Activity Console**: Streams real-time command output line-by-line with color-coded severity (Info, Success, Warning, Error) and 1-click log export.
 - **Task Safety & Control**: Includes a "Cancel Task" button to abort long-running tasks, plus pre-repair System Restore Point creation.

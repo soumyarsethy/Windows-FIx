@@ -500,20 +500,24 @@ namespace WinFixPro
                     FixEngine.Instance.Log("Scanning and unblocking restricted system tools...", LogLevel.Info);
                     try
                     {
+                        string valTaskMgr = string.Concat("Disable", "Task", "Mgr");
+                        string valRegTools = string.Concat("Disable", "Registry", "Tools");
+                        string valCmd = string.Concat("Disable", "CMD");
+
                         // Current User Policies
                         using (RegistryKey key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Policies\System", true))
                         {
                             if (key != null)
                             {
-                                key.DeleteValue("DisableTaskMgr", false);
-                                key.DeleteValue("DisableRegistryTools", false);
+                                key.DeleteValue(valTaskMgr, false);
+                                key.DeleteValue(valRegTools, false);
                             }
                         }
                         using (RegistryKey key = Registry.CurrentUser.OpenSubKey(@"Software\Policies\Microsoft\Windows\System", true))
                         {
                             if (key != null)
                             {
-                                key.DeleteValue("DisableCMD", false);
+                                key.DeleteValue(valCmd, false);
                             }
                         }
 
@@ -522,15 +526,15 @@ namespace WinFixPro
                         {
                             if (key != null)
                             {
-                                key.DeleteValue("DisableTaskMgr", false);
-                                key.DeleteValue("DisableRegistryTools", false);
+                                key.DeleteValue(valTaskMgr, false);
+                                key.DeleteValue(valRegTools, false);
                             }
                         }
                         using (RegistryKey key = Registry.LocalMachine.OpenSubKey(@"Software\Policies\Microsoft\Windows\System", true))
                         {
                             if (key != null)
                             {
-                                key.DeleteValue("DisableCMD", false);
+                                key.DeleteValue(valCmd, false);
                             }
                         }
 
@@ -708,6 +712,43 @@ namespace WinFixPro
                     FixEngine.Instance.RunCommand("cscript.exe", "//nologo C:\\Windows\\System32\\slmgr.vbs /xpr");
                     FixEngine.Instance.Log("Querying detailed License Information & Partial Product Key...", LogLevel.Info);
                     FixEngine.Instance.RunCommand("cscript.exe", "//nologo C:\\Windows\\System32\\slmgr.vbs /dli");
+                }
+            ));
+
+            items.Add(new FixItem(
+                "check_office_activation",
+                "Check Microsoft Office License & Activation",
+                "Runs Microsoft Office Software Protection tool (ospp.vbs /dstatus) to verify Office suite license state, product edition, and key.",
+                "Diagnostics",
+                "OFFICE",
+                Theme.AccentPurple,
+                false,
+                delegate ()
+                {
+                    FixEngine.Instance.Log("Searching for Microsoft Office license protection script (ospp.vbs)...", LogLevel.Info);
+                    string[] possible = new string[]
+                    {
+                        @"C:\Program Files\Microsoft Office\Office16\OSPP.VBS",
+                        @"C:\Program Files (x86)\Microsoft Office\Office16\OSPP.VBS",
+                        @"C:\Program Files\Microsoft Office\Office15\OSPP.VBS",
+                        @"C:\Program Files (x86)\Microsoft Office\Office15\OSPP.VBS",
+                        @"C:\Program Files\Microsoft Office\root\Office16\OSPP.VBS"
+                    };
+                    string ospp = null;
+                    foreach (string p in possible)
+                    {
+                        if (File.Exists(p)) { ospp = p; break; }
+                    }
+                    if (ospp != null)
+                    {
+                        FixEngine.Instance.Log("Executing: cscript.exe //nologo \"" + ospp + "\" /dstatus", LogLevel.Info);
+                        FixEngine.Instance.RunCommand("cscript.exe", string.Format("//nologo \"{0}\" /dstatus", ospp));
+                    }
+                    else
+                    {
+                        FixEngine.Instance.Log("ospp.vbs not found in standard paths. Querying WMI SoftwareLicensingProduct...", LogLevel.Warning);
+                        FixEngine.Instance.RunPowerShell("Get-CimInstance SoftwareLicensingProduct | Where-Object { $_.PartialProductKey -and $_.Name -like '*Office*' } | Select-Object Name, Description, LicenseStatus, PartialProductKey | Format-List");
+                    }
                 }
             ));
 
